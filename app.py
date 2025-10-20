@@ -9,38 +9,36 @@ import subprocess
 import shutil
 import glob
 import re
+import csv, io, datetime
+from dataclasses import dataclass, asdict
 from collections import deque
 from typing import Optional, Dict, Any
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 
-# ===================== NVML (GPU metrics, если доступна) =====================
+# ===================== NVML bootstrap =====================
 _NV_OK = False
 _NV_ERR: Optional[str] = None
 _HANDLE = None
 
 def _hint_nvml_path_windows() -> Optional[str]:
     p = os.environ.get("NVML_DLL")
-    if p and os.path.isfile(p):
-        return p
+    if p and os.path.isfile(p): return p
     try:
         nvsmi = shutil.which("nvidia-smi")
         if nvsmi:
             cand = os.path.join(os.path.dirname(nvsmi), "nvml.dll")
-            if os.path.isfile(cand):
-                return cand
+            if os.path.isfile(cand): return cand
     except Exception:
         pass
     for cand in (
         r"C:\Program Files\NVIDIA Corporation\NVSMI\nvml.dll",
         r"C:\Windows\System32\nvml.dll",
     ):
-        if os.path.isfile(cand):
-            return cand
+        if os.path.isfile(cand): return cand
     try:
         for path in glob.glob(r"C:\Windows\System32\DriverStore\FileRepository\*\nvml.dll"):
-            if os.path.isfile(path):
-                return path
+            if os.path.isfile(path): return path
     except Exception:
         pass
     return None
@@ -49,10 +47,8 @@ try:
     if platform.system() == "Windows":
         dll = _hint_nvml_path_windows()
         if dll:
-            try:
-                os.add_dll_directory(os.path.dirname(dll))  # py3.8+
-            except Exception:
-                pass
+            try: os.add_dll_directory(os.path.dirname(dll))
+            except Exception: pass
             os.environ["NVML_DLL"] = dll
     import pynvml  # pip install nvidia-ml-py3
     try:
@@ -64,29 +60,22 @@ try:
 except Exception as e:
     _NV_ERR = f"pynvml import failed: {e!r}"
 
-# ===================== nvidia-smi fallback (реальные метрики без NVML) =====================
+# ========== nvidia-smi fallback ==========
 def _find_nvidia_smi() -> Optional[str]:
     cand = os.environ.get("NVIDIA_SMI")
-    if cand and os.path.isfile(cand):
-        return cand
+    if cand and os.path.isfile(cand): return cand
     cand = shutil.which("nvidia-smi")
-    if cand and os.path.isfile(cand):
-        return cand
-    patterns = [
-        r"C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_*",
-        r"C:\Program Files\NVIDIA Corporation\NVSMI",
-    ]
-    for pat in patterns:
+    if cand and os.path.isfile(cand): return cand
+    for pat in (r"C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_*",
+                r"C:\Program Files\NVIDIA Corporation\NVSMI"):
         for root in glob.glob(pat):
             exe = os.path.join(root, "nvidia-smi.exe")
-            if os.path.isfile(exe):
-                return exe
+            if os.path.isfile(exe): return exe
     return None
 
 def _read_metrics_via_nvsmi() -> Optional[Dict[str, Any]]:
     exe = _find_nvidia_smi()
-    if not exe:
-        return None
+    if not exe: return None
     query = [
         "name","driver_version","temperature.gpu","utilization.gpu",
         "memory.used","memory.total","fan.speed","power.draw",
@@ -99,14 +88,11 @@ def _read_metrics_via_nvsmi() -> Optional[Dict[str, Any]]:
         return None
     line = out.strip().splitlines()[0].strip()
     parts = [p.strip() for p in line.split(",")]
-    if len(parts) < len(query):
-        return None
+    if len(parts) < len(query): return None
 
     def to_int(x, default=0):
-        try:
-            return int(float(re.sub(r"[^\d.\-]", "", x)))
-        except Exception:
-            return default
+        try: return int(float(re.sub(r"[^\d.\-]", "", x)))
+        except Exception: return default
 
     return {
         "name": parts[0],
@@ -123,49 +109,64 @@ def _read_metrics_via_nvsmi() -> Optional[Dict[str, Any]]:
         "nvsmi_path": exe,
     }
 
-# ================== Stress backends (CuPy/OpenCL/CPU) ==================
+# ========== Stress backends ==========
 _CUPY_OK = False
 _OPENCL_OK = False
 try:
-    import cupy as cp  # pip install cupy-cuda12x (или cupy-cuda11x)
+    import cupy as cp  # pip install cupy-cuda12x  (или подходящий под драйвер)
     _CUPY_OK = True
 except Exception:
     pass
-
 try:
     import numpy as _np
-    import pyopencl as cl        # pip install pyopencl
+    import pyopencl as cl        # pip install pyopencl (если нужно)
     _OPENCL_OK = True
 except Exception:
     pass
 
 app = Flask(__name__)
 
-# ====================== State & history ======================
+# ========== State & history ==========
+hist_temperature = deque(maxlen=600)
+hist_load = deque(maxlen=600)
+hist_labels = deque(maxlen=600)
+
+@dataclass
+class TestResult:
+    id: int
+    profile: str
+    backend: str
+    started_at: str
+    finished_at: str
+    duration_sec: int
+    max_temp: int
+    avg_temp: float
+    max_load: int
+    avg_load: float
+    max_power: int
+    avg_power: float
+    status: str
+
 class State:
     def __init__(self):
         self.running: bool = False
         self.started_at: Optional[float] = None
         self.profile: Optional[str] = None
         self.lock = threading.Lock()
+        self.session_points: list[tuple[float, int, int, int]] = []
 
 STATE = State()
+RESULTS: list[TestResult] = []
+_NEXT_ID = 1
 
-hist_temperature = deque(maxlen=600)  # ~10 минут по 1с
-hist_load = deque(maxlen=600)
-hist_labels = deque(maxlen=600)
-
-# ====================== Metrics helpers ======================
+# ========== Metrics ==========
 def _safe_call(fn, *args, default=None):
-    try:
-        return fn(*args)
-    except Exception:
-        return default
+    try: return fn(*args)
+    except Exception: return default
 
 def _mock_metrics(nvml_error: Optional[str]) -> Dict[str, Any]:
     temp = random.randint(45, 75)
     util = random.randint(5, 95)
-    mem_used_mb, mem_total_mb = 6200, 12288
     fan = random.randint(20, 70)
     power = random.randint(100, 350)
     return {
@@ -173,8 +174,8 @@ def _mock_metrics(nvml_error: Optional[str]) -> Dict[str, Any]:
         "driver": "n/a",
         "temperature": temp,
         "load": util,
-        "mem_used_mb": mem_used_mb,
-        "mem_total_mb": mem_total_mb,
+        "mem_used_mb": 6200,
+        "mem_total_mb": 12288,
         "fan_percent": fan,
         "power_w": power,
         "core_clock_mhz": 0,
@@ -186,7 +187,6 @@ def _mock_metrics(nvml_error: Optional[str]) -> Dict[str, Any]:
     }
 
 def read_gpu_metrics() -> Dict[str, Any]:
-    """Сначала NVML, если не получилось — nvidia-smi, иначе мок."""
     # 1) NVML
     if _NV_OK and _HANDLE is not None:
         try:
@@ -207,35 +207,21 @@ def read_gpu_metrics() -> Dict[str, Any]:
             core_clock = int(_safe_call(pynvml.nvmlDeviceGetClockInfo, _HANDLE, pynvml.NVML_CLOCK_GRAPHICS, default=0) or 0)
             mem_clock  = int(_safe_call(pynvml.nvmlDeviceGetClockInfo, _HANDLE, pynvml.NVML_CLOCK_MEM,      default=0) or 0)
             return {
-                "name": name,
-                "driver": driver,
-                "temperature": temp,
-                "load": util,
-                "mem_used_mb": mem_used_mb,
-                "mem_total_mb": mem_total_mb,
-                "fan_percent": fan,
-                "power_w": power_w,
-                "core_clock_mhz": core_clock,
-                "mem_clock_mhz": mem_clock,
-                "nvml_ok": True,
-                "nvml_error": None,
-                "nvsmi_ok": False,
-                "nvsmi_path": None,
+                "name": name, "driver": driver,
+                "temperature": temp, "load": util,
+                "mem_used_mb": mem_used_mb, "mem_total_mb": mem_total_mb,
+                "fan_percent": fan, "power_w": power_w,
+                "core_clock_mhz": core_clock, "mem_clock_mhz": mem_clock,
+                "nvml_ok": True, "nvml_error": None,
+                "nvsmi_ok": False, "nvsmi_path": None,
             }
-        except Exception as e:
-            # провал NVML → ниже попробуем nvidia-smi
+        except Exception:
             pass
-
     # 2) nvidia-smi
     via_smi = _read_metrics_via_nvsmi()
     if via_smi:
-        return {
-            **via_smi,
-            "nvml_ok": False,
-            "nvml_error": _NV_ERR or "NVML not available; using nvidia-smi",
-        }
-
-    # 3) мок
+        return {**via_smi, "nvml_ok": False, "nvml_error": _NV_ERR or "NVML not available; using nvidia-smi"}
+    # 3) mock
     return _mock_metrics(nvml_error=_NV_ERR or "NVML & nvidia-smi not available")
 
 def _metrics_sampler():
@@ -244,44 +230,20 @@ def _metrics_sampler():
         hist_temperature.append(m["temperature"])
         hist_load.append(m["load"])
         hist_labels.append(time.strftime("%H:%M:%S"))
+        if STATE.running:
+            STATE.session_points.append((time.time(), int(m["temperature"]), int(m["load"]), int(m.get("power_w", 0) or 0)))
         time.sleep(1)
 
 threading.Thread(target=_metrics_sampler, daemon=True).start()
 
-def _pick_gemm_size_for_gpu(target_gb: float = 2.0) -> int:
-    """
-    Прикидываем размер квадратной матрицы под доступную память GPU.
-    По умолчанию пытаемся занять ~2 ГБ (A,B,C по float32): 3 * N*N * 4 байта ≈ target_gb GiB.
-    Возвращаем ближайший «красивый» размер (кратно 256).
-    """
-    if _CUPY_OK:
-        try:
-            import cupy as cp
-            free, total = cp.cuda.runtime.memGetInfo()
-            free_gb = free / (1024 ** 3)
-            # не больше 60% от свободной памяти, но не меньше target_gb
-            use_gb = min(free_gb * 0.6, max(target_gb, 1.0))
-            # 3*N*N*4 ≈ use_gb * 1024**3 -> N ≈ sqrt((use_gb*2**30)/(12))
-            import math
-            n = int(math.sqrt((use_gb * (1024 ** 3)) / 12))
-            # округлим вверх до кратности 256
-            n = max(1024, (n // 256) * 256)
-            return n
-        except Exception:
-            pass
-    # fallback, если что-то пошло не так
-    return 4096
-
-
-# ====================== Stress worker ======================
+# ========== Stress ==========
 class StressWorker:
     def __init__(self):
         self._th: Optional[threading.Thread] = None
         self._stop = threading.Event()
 
     def start(self, profile: str):
-        if self.is_running():
-            return
+        if self.is_running(): return
         self._stop.clear()
         self._th = threading.Thread(target=self._run, args=(profile,), daemon=True)
         self._th.start()
@@ -289,68 +251,49 @@ class StressWorker:
     def stop(self):
         self._stop.set()
         t = self._th
-        if t and t.is_alive():
-            t.join(timeout=3.0)
+        if t and t.is_alive(): t.join(timeout=3.0)
         self._th = None
         self._stop.clear()
 
     def is_running(self) -> bool:
         return self._th is not None and self._th.is_alive() and not self._stop.is_set()
 
-    # ------------------ профили ------------------
     def _profile_params(self, profile: str):
-        # duration, intensity, memory_mode
-        # intensity влияет на размер матриц и паузы
-        if profile == "quick":
-            return (10 * 60, 0.6, False)
-        if profile == "full":
-            return (30 * 60, 1.0, False)
-        if profile == "thermal":
-            return (60 * 60, 1.2, False)
-        if profile == "memory":
-            return (45 * 60, 1.0, True)
+        if profile == "quick":   return (10 * 60, 0.6, False)
+        if profile == "full":    return (30 * 60, 1.0, False)
+        if profile == "thermal": return (60 * 60, 1.2, False)
+        if profile == "memory":  return (45 * 60, 1.0, True)
         return (10 * 60, 0.6, False)
 
     def _run(self, profile: str):
         dur_sec, intensity, memory_mode = self._profile_params(profile)
         deadline = time.time() + dur_sec
-
         if _CUPY_OK:
             try:
-                self._burn_cupy(intensity=intensity, deadline=deadline, memory_mode=memory_mode)
-                return
+                self._burn_cupy(intensity, deadline, memory_mode); return
             except Exception:
                 pass
-
         if _OPENCL_OK:
             try:
-                self._burn_opencl(intensity=intensity, deadline=deadline, memory_mode=memory_mode)
-                return
+                self._burn_opencl(intensity, deadline, memory_mode); return
             except Exception:
                 pass
+        self._burn_cpu(intensity, deadline, memory_mode)
 
-        self._burn_cpu(intensity=intensity, deadline=deadline, memory_mode=memory_mode)
-
-    # ------------------ CuPy (CUDA) ------------------
+    # --- CUDA/CuPy ---
     def _burn_cupy(self, intensity: float, deadline: float, memory_mode: bool):
         import cupy as cp
-        import time as _time
-
-        # Явно выбираем дискретную карту (GPU 0)
         try:
             cp.cuda.Device(0).use()
         except Exception:
             pass
 
-        # --- прогрев, чтобы поднялись частоты ---
         a_w = cp.random.random((2048, 2048), dtype=cp.float32)
         b_w = cp.random.random((2048, 2048), dtype=cp.float32)
         for _ in range(20):
             _ = a_w.dot(b_w)
         cp.cuda.Stream.null.synchronize()
 
-        # --- подбираем большой размер GEMM ---
-        # для 3060 хватит 8192–12288; начнем с 12288 и, если не влезет, откатимся на 8192
         def _try_size(n):
             a = cp.random.random((n, n), dtype=cp.float32)
             b = cp.random.random((n, n), dtype=cp.float32)
@@ -366,38 +309,29 @@ class StressWorker:
                 break
             except Exception:
                 cp.get_default_memory_pool().free_all_blocks()
-
         if mats is None:
-            # если совсем тесно, скатимся на 6144
             mats = _try_size(6144)
 
         a, b, c = mats
-
-        # Доп. захват VRAM в memory-режиме (реалистичный «жор» памяти: + ~3–6 ГБ)
         scratch = None
         if memory_mode:
             try:
-                # 3–4 больших куска по 4096x4096 (~192 МБ каждый), суммарно ~0.6–0.8 ГБ
-                # увеличиваем до ~ нескольких гигабайт постепенно, чтобы не бахнуло OOM
                 chunks = []
-                for k in range(20):  # ~20 кусков ≈ 3.8 ГБ
+                for _ in range(20):  # ~3–4 ГБ
                     chunks.append(cp.empty((4096, 4096), dtype=cp.float32))
                 scratch = chunks
             except Exception:
                 pass
 
-        # --- беспрерывная математика (cuBLAS GEMM) без пауз ---
-        last_scale = _time.time()
-        while not self._stop.is_set() and _time.time() < deadline:
-            cp.matmul(a, b, out=c)  # плотный GEMM
-            c += a  # чуть мешаем данные
+        last_scale = time.time()
+        while not self._stop.is_set() and time.time() < deadline:
+            cp.matmul(a, b, out=c)
+            c += a
             if memory_mode and scratch:
-                for buf in scratch[:5]:  # слегка «шевелим» часть буферов
+                for buf in scratch[:5]:
                     buf *= 1.000001
             cp.cuda.Stream.null.synchronize()
-
-            # каждые ~15с пытаемся чуть увеличить размер (если есть запас)
-            if _time.time() - last_scale > 15:
+            if time.time() - last_scale > 15:
                 try:
                     new_n = a.shape[0] + 512
                     a = cp.random.random((new_n, new_n), dtype=cp.float32)
@@ -405,36 +339,29 @@ class StressWorker:
                     c = cp.zeros((new_n, new_n), dtype=cp.float32)
                 except Exception:
                     pass
-                last_scale = _time.time()
+                last_scale = time.time()
 
-    # ------------------ OpenCL ------------------
+    # --- OpenCL ---
     def _burn_opencl(self, intensity: float, deadline: float, memory_mode: bool):
         import numpy as np
         import pyopencl as cl
-
         platforms = cl.get_platforms()
         gpus = []
         for p in platforms:
             gpus.extend(p.get_devices(device_type=cl.device_type.GPU))
         if not gpus:
             raise RuntimeError("No OpenCL GPU devices")
-
         ctx = cl.Context(devices=gpus)
         queue = cl.CommandQueue(ctx)
-
-        # размер под интенсивность (скалярная операция, но большая)
         base = 1024 * 1024 * (64 if intensity >= 1.0 else 32)
         n = int(base * min(max(intensity, 0.5), 2.0))
-
         A = np.random.rand(n).astype("float32")
         B = np.random.rand(n).astype("float32")
         C = np.zeros(n, dtype="float32")
-
         mf = cl.mem_flags
         dA = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=A)
         dB = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=B)
         dC = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=C)
-
         prg = cl.Program(ctx, """
         __kernel void muladd(__global const float* a,
                              __global const float* b,
@@ -444,14 +371,13 @@ class StressWorker:
             int gid = get_global_id(0);
             c[gid] = alpha * a[gid] * b[gid] + beta * c[gid];
         }""").build()
-
-        alpha = np.float32(1.000001 if memory_mode else 1.0)
-        beta  = np.float32(1.000001 if memory_mode else 1.0)
+        alpha = _np.float32(1.000001 if memory_mode else 1.0)
+        beta  = _np.float32(1.000001 if memory_mode else 1.0)
         while not self._stop.is_set() and time.time() < deadline:
             prg.muladd(queue, (n,), None, dA, dB, dC, alpha, beta)
             queue.finish()
 
-    # ------------------ CPU fallback ------------------
+    # --- CPU fallback ---
     def _burn_cpu(self, intensity: float, deadline: float, memory_mode: bool):
         import numpy as np
         base = 2048 if intensity < 1.0 else 4096
@@ -460,17 +386,15 @@ class StressWorker:
         b = np.random.rand(n, n).astype("float32")
         c = np.zeros((n, n), dtype="float32")
         while not self._stop.is_set() and time.time() < deadline:
-            c += a @ b  # плотно грузит CPU
-            if memory_mode:
-                c *= 1.000001
-
-
+            c += a @ b
+            if memory_mode: c *= 1.000001
 
 STRESS = StressWorker()
 
-# ====================== Routes ======================
+# ========== Routes ==========
 @app.route("/")
 def index():
+    # index.html и stress.html должны лежать в папке templates/
     return render_template("index.html", brand="gpubench")
 
 @app.route("/stress")
@@ -501,20 +425,61 @@ def api_test_start():
     with STATE.lock:
         if STATE.running:
             return jsonify({"ok": False, "error": "already_running"}), 400
+        STATE.session_points = []
         STATE.running = True
         STATE.started_at = time.time()
         STATE.profile = profile
         STRESS.start(profile)
     return jsonify({"ok": True, "running": True, "profile": profile})
 
+def _finalize_result() -> TestResult:
+    global _NEXT_ID
+    points = STATE.session_points[:]
+    started_ts = STATE.started_at or time.time()
+    finished_ts = time.time()
+    duration = int(finished_ts - started_ts)
+    if not points: points = [(time.time(), 0, 0, 0)]
+    temps  = [t for _, t, _, _ in points]
+    loads  = [l for _, _, l, _ in points]
+    powers = [p for _, _, _, p in points if isinstance(p, int)]
+    max_temp = max(temps)
+    avg_temp = sum(temps) / len(temps)
+    max_load = max(loads)
+    avg_load = sum(loads) / len(loads)
+    max_power = max(powers) if powers else 0
+    avg_power = int(sum(powers) / len(powers)) if powers else 0
+    status = "Passed" if max_temp < 87 else "Warning"
+    started_iso  = datetime.datetime.fromtimestamp(started_ts).isoformat(timespec="seconds")
+    finished_iso = datetime.datetime.fromtimestamp(finished_ts).isoformat(timespec="seconds")
+    res = TestResult(
+        id=_NEXT_ID,
+        profile=STATE.profile or "unknown",
+        backend=("cupy" if _CUPY_OK else ("opencl" if _OPENCL_OK else "cpu-fallback")),
+        started_at=started_iso,
+        finished_at=finished_iso,
+        duration_sec=duration,
+        max_temp=int(max_temp),
+        avg_temp=round(avg_temp, 1),
+        max_load=int(max_load),
+        avg_load=round(avg_load, 1),
+        max_power=int(max_power),
+        avg_power=int(avg_power),
+        status=status,
+    )
+    _NEXT_ID += 1
+    return res
+
 @app.route("/api/test/stop", methods=["POST"])
 def api_test_stop():
     with STATE.lock:
         STRESS.stop()
+        result = _finalize_result()
+        RESULTS.append(result)
         STATE.running = False
         STATE.profile = None
         STATE.started_at = None
-    return jsonify({"ok": True, "running": False})
+        STATE.session_points = []
+    return jsonify({"ok": True, "running": False, "result": asdict(result)})
 
 @app.route("/api/test/status")
 def api_test_status():
@@ -534,7 +499,34 @@ def api_test_status():
     })
     return jsonify(data)
 
-@app.route("/api/debug")
+@app.route("/api/test/results")
+def api_test_results():
+    data = [asdict(r) for r in reversed(RESULTS)]
+    return jsonify({"results": data})
+
+@app.route("/api/test/export/<int:rid>")
+def api_test_export(rid: int):
+    res = next((r for r in RESULTS if r.id == rid), None)
+    if not res:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id","profile","backend","started_at","finished_at","duration_sec",
+                     "max_temp","avg_temp","max_load","avg_load","max_power","avg_power","status"])
+    writer.writerow([
+        res.id, res.profile, res.backend, res.started_at, res.finished_at, res.duration_sec,
+        res.max_temp, res.avg_temp, res.max_load, res.avg_load, res.max_power, res.avg_power, res.status
+    ])
+    csv_bytes = io.BytesIO(output.getvalue().encode("utf-8"))
+    filename = f"gpubench_result_{res.id}.csv"
+    return send_file(csv_bytes, mimetype="text/csv", as_attachment=True, download_name=filename)
+
+@app.route("/api/test/export/latest")
+def api_test_export_latest():
+    if not RESULTS:
+        return jsonify({"ok": False, "error": "no_results"}), 404
+    return api_test_export(RESULTS[-1].id)
+
 @app.route("/api/debug")
 def api_debug():
     cupy_info = None
@@ -561,7 +553,5 @@ def api_debug():
         "cupy": cupy_info,
     })
 
-
 if __name__ == "__main__":
-    # Flask dev-server
     app.run(host="127.0.0.1", port=5000, debug=True)
