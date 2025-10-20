@@ -34,30 +34,21 @@
 ## 🛠 Установка
 
 ### 1️⃣ Клонируй проект
-```bash
-git clone https://github.com/yourname/gpubench.git
+git clone https://github.com/xtwelzy/gpubench.git
 cd gpubench
 2️⃣ Создай виртуальное окружение
-bash
-Копировать код
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 3️⃣ Установи зависимости
-bash
-Копировать код
 pip install -r requirements.txt
 (Выбери нужную версию CuPy под свою CUDA — см. комментарии в requirements.txt.)
 
 ▶️ Запуск
-bash
-Копировать код
 python app.py
 Открой браузер и перейди по адресу:
 👉 http://127.0.0.1:5000
 
 🧪 Структура проекта
-csharp
-Копировать код
 gpubench/
 │
 ├── app.py                  # Основной Flask-сервер
@@ -66,23 +57,16 @@ gpubench/
 ├── templates/
 │   ├── index.html          # Панель мониторинга
 │   └── stress.html         # Стресс-тестирование
-│
-└── static/                 # (по желанию) изображения, favicon и т.д.
+
 📊 Результаты тестов
 После завершения стресс-теста результаты доступны в браузере:
 
-bash
-Копировать код
 /api/test/results
 или напрямую скачиваются CSV-файлом:
 
-swift
-Копировать код
 /api/test/export/latest
 CSV содержит поля:
 
-bash
-Копировать код
 id, profile, backend, started_at, finished_at,
 duration_sec, max_temp, avg_temp, max_load,
 avg_load, max_power, avg_power, status
@@ -104,8 +88,6 @@ Python 3.9+
 
 можно вручную задать путь:
 
-python
-Копировать код
 os.environ["NVML_DLL"] = r"C:\Windows\System32\nvml.dll"
 🧾 Лицензия
 MIT License © 2025 [yourname]# 🧠 gpubench — GPU Stress Testing & Monitoring Suite
@@ -144,30 +126,21 @@ MIT License © 2025 [yourname]# 🧠 gpubench — GPU Stress Testing & Monitorin
 ## 🛠 Установка
 
 ### 1️⃣ Клонируй проект
-```bash
 git clone https://github.com/yourname/gpubench.git
 cd gpubench
 2️⃣ Создай виртуальное окружение
-bash
-Копировать код
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 3️⃣ Установи зависимости
-bash
-Копировать код
 pip install -r requirements.txt
 (Выбери нужную версию CuPy под свою CUDA — см. комментарии в requirements.txt.)
 
 ▶️ Запуск
-bash
-Копировать код
 python app.py
 Открой браузер и перейди по адресу:
 👉 http://127.0.0.1:5000
 
 🧪 Структура проекта
-csharp
-Копировать код
 gpubench/
 │
 ├── app.py                  # Основной Flask-сервер
@@ -176,23 +149,15 @@ gpubench/
 ├── templates/
 │   ├── index.html          # Панель мониторинга
 │   └── stress.html         # Стресс-тестирование
-│
-└── static/                 # (по желанию) изображения, favicon и т.д.
 📊 Результаты тестов
 После завершения стресс-теста результаты доступны в браузере:
 
-bash
-Копировать код
 /api/test/results
 или напрямую скачиваются CSV-файлом:
 
-swift
-Копировать код
 /api/test/export/latest
 CSV содержит поля:
 
-bash
-Копировать код
 id, profile, backend, started_at, finished_at,
 duration_sec, max_temp, avg_temp, max_load,
 avg_load, max_power, avg_power, status
@@ -214,8 +179,6 @@ Python 3.9+
 
 можно вручную задать путь:
 
-python
-Копировать код
 os.environ["NVML_DLL"] = r"C:\Windows\System32\nvml.dll"
 🧾 Лицензия
 MIT License © 2025 [xtwelzy]
