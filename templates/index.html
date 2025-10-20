@@ -22,7 +22,7 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <!-- Navigation -->
+    <!-- Nav -->
     <nav class="nav-gradient rounded-2xl px-6 py-4 mt-6 mb-8 shadow-lg">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
@@ -33,127 +33,96 @@
         <div class="flex space-x-1">
           <a href="{{ url_for('index') }}"  class="px-4 py-2 bg-white/20 text-white rounded-xl font-medium text-sm">Dashboard</a>
           <a href="{{ url_for('stress') }}" class="px-4 py-2 text-white/80 hover:text-white rounded-xl font-medium text-sm">Stress Test</a>
-          <button class="p-2 text-white/80 hover:text-white rounded-full"><i data-feather="settings"></i></button>
+          <a href="/api/debug" class="p-2 text-white/80 hover:text-white rounded-full" title="Debug JSON"><i data-feather="terminal"></i></a>
         </div>
       </div>
     </nav>
 
-    <!-- GPU Summary -->
+    <!-- Summary -->
     <div class="glass-card p-6 mb-8">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <div class="flex items-center space-x-4">
             <h2 class="text-2xl font-bold text-gray-800" id="gpu-name">GPU</h2>
-            <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center" id="gpu-state-chip">
-              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Optimal
+            <span id="state-chip" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium flex items-center">
+              <span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+              <span id="state-label">—</span>
             </span>
           </div>
           <p class="text-gray-500 mt-1" id="gpu-driver">Driver: —</p>
         </div>
-        <div class="flex space-x-4 mt-4 md:mt-0">
-          <div class="text-center">
+        <div class="flex space-x-10 mt-4 md:mt-0">
+          <div class="text-right">
             <p class="text-sm text-gray-500">Core Clock</p>
-            <p class="text-lg font-semibold text-gray-800">—</p>
+            <p class="text-lg font-semibold text-gray-800"><span id="core-clock">—</span></p>
           </div>
-          <div class="text-center">
+          <div class="text-right">
             <p class="text-sm text-gray-500">Memory Clock</p>
-            <p class="text-lg font-semibold text-gray-800">—</p>
+            <p class="text-lg font-semibold text-gray-800"><span id="mem-clock">—</span></p>
           </div>
-          <div class="text-center">
+          <div class="text-right">
             <p class="text-sm text-gray-500">Power Draw</p>
-            <p class="text-lg font-semibold text-gray-800" id="power-w">—</p>
+            <p class="text-lg font-semibold text-gray-800"><span id="power-w">—</span></p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Main Metrics Grid -->
+    <!-- Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-      <!-- Temperature -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-sm text-gray-500">Temperature</p>
-            <p class="text-3xl font-bold text-gray-800"><span id="temp-now">—</span>°C</p>
-          </div>
-          <div class="temp-gauge w-16 h-16 rounded-full flex items-center justify-center">
-            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-              <span class="text-sm font-bold text-gray-800" id="temp-center">—°</span>
-            </div>
-          </div>
+          <div><p class="text-sm text-gray-500">Temperature</p><p class="text-3xl font-bold text-gray-800"><span id="temp-now">—</span>°C</p></div>
+          <div class="temp-gauge w-16 h-16 rounded-full flex items-center justify-center"><div class="w-12 h-12 bg-white rounded-full flex items-center justify-center"><span class="text-sm font-bold text-gray-800" id="temp-center">—°</span></div></div>
         </div>
         <div class="h-40"><canvas id="tempChart"></canvas></div>
       </div>
 
-      <!-- Load -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-sm text-gray-500">GPU Load</p>
-            <p class="text-3xl font-bold text-gray-800"><span id="load-now">—</span>%</p>
-          </div>
+          <div><p class="text-sm text-gray-500">GPU Load</p><p class="text-3xl font-bold text-gray-800"><span id="load-now">—</span>%</p></div>
           <i data-feather="activity" class="text-indigo-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="loadChart"></canvas></div>
       </div>
 
-      <!-- Memory -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-sm text-gray-500">Memory Usage</p>
-            <p class="text-3xl font-bold text-gray-800"><span id="mem-used">—</span>/<span id="mem-total">—</span> MB</p>
-          </div>
+          <div><p class="text-sm text-gray-500">Memory Usage</p><p class="text-3xl font-bold text-gray-800"><span id="mem-used">—</span>/<span id="mem-total">—</span> MB</p></div>
           <i data-feather="database" class="text-purple-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="memoryChart"></canvas></div>
       </div>
 
-      <!-- Fan -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-sm text-gray-500">Fan Speed</p>
-            <p class="text-3xl font-bold text-gray-800"><span id="fan-now">—</span>%</p>
-          </div>
+          <div><p class="text-sm text-gray-500">Fan Speed</p><p class="text-3xl font-bold text-gray-800"><span id="fan-now">—</span>%</p></div>
           <i data-feather="wind" class="text-blue-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="fanChart"></canvas></div>
       </div>
 
-      <!-- Power -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-sm text-gray-500">Power Consumption</p>
-            <p class="text-3xl font-bold text-gray-800"><span id="power-now">—</span>W</p>
-          </div>
+          <div><p class="text-sm text-gray-500">Power Consumption</p><p class="text-3xl font-bold text-gray-800"><span id="power-now">—</span>W</p></div>
           <i data-feather="zap" class="text-yellow-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="powerChart"></canvas></div>
       </div>
 
-      <!-- Perf bar (визуал) -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-sm text-gray-500">Performance Score</p>
-            <p class="text-3xl font-bold text-gray-800">—</p>
-          </div>
+          <div><p class="text-sm text-gray-500">Performance Score</p><p class="text-3xl font-bold text-gray-800">—</p></div>
           <i data-feather="award" class="text-green-500" width="32" height="32"></i>
         </div>
         <div class="h-40 flex items-center">
-          <div class="w-full bg-gray-200 rounded-full h-4">
-            <div class="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full" style="width: 60%"></div>
-          </div>
+          <div class="w-full bg-gray-200 rounded-full h-4"><div class="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full" style="width: 60%"></div></div>
         </div>
-        <div class="mt-4 text-sm text-gray-500">
-          <p>System is performing within expected parameters</p>
-        </div>
+        <div class="mt-4 text-sm text-gray-500"><p>System is performing within expected parameters</p></div>
       </div>
     </div>
 
-    <!-- Historical -->
+    <!-- History -->
     <div class="glass-card p-6 mb-8">
       <div class="flex justify-between items-center mb-6">
         <h3 class="text-lg font-semibold text-gray-800">Historical Performance (24h)</h3>
@@ -168,6 +137,7 @@
   </div>
 
   <script>feather.replace();</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     function mkChart(ctx, label, color) {
       return new Chart(ctx, {
@@ -189,10 +159,23 @@
       chart.update();
     }
 
+    function setChip(temp) {
+      const chip = document.getElementById('state-chip');
+      const label = document.getElementById('state-label');
+      if (temp >= 85) { chip.className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium flex items-center"; label.textContent="Hot"; }
+      else if (temp >= 75) { chip.className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center"; label.textContent="Elevated"; }
+      else { chip.className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center"; label.textContent="Optimal"; }
+    }
+
     async function refreshGpu() {
       const r = await fetch('/api/gpu'); const d = await r.json();
+
       document.getElementById('gpu-name').textContent = d.name || 'GPU';
       document.getElementById('gpu-driver').textContent = 'Driver: ' + (d.driver || '—');
+
+      document.getElementById('core-clock').textContent = d.core_clock_mhz ? (d.core_clock_mhz + ' MHz') : '—';
+      document.getElementById('mem-clock').textContent  = d.mem_clock_mhz  ? (d.mem_clock_mhz  + ' MHz') : '—';
+      document.getElementById('power-w').textContent    = d.power_w        ? (d.power_w + ' W') : '—';
 
       document.getElementById('temp-now').textContent = d.temperature ?? '—';
       document.getElementById('temp-center').textContent = (d.temperature ?? '—') + '°';
@@ -201,19 +184,18 @@
       document.getElementById('mem-total').textContent = d.mem_total_mb ?? '—';
       document.getElementById('fan-now').textContent = d.fan_percent ?? '—';
       document.getElementById('power-now').textContent = d.power_w ?? '—';
-      document.getElementById('power-w').textContent = (d.power_w ?? '—') + 'W';
 
-      // Чип статуса по температуре
-      const chip = document.getElementById('gpu-state-chip');
-      if (d.temperature >= 85) chip.className = "px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium flex items-center";
-      else if (d.temperature >= 75) chip.className = "px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center";
-      else chip.className = "px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center";
+      setChip(d.temperature || 0);
 
       push(tempChart, d.temperature || 0);
       push(loadChart, d.load || 0);
       push(memChart, d.mem_used_mb || 0);
       push(fanChart, d.fan_percent || 0);
       push(powerChart, d.power_w || 0);
+
+      // Если NVML отсутствует — покажи подсказку в title чипа
+      const chip = document.getElementById('state-chip');
+      chip.title = d.nvml_ok ? 'NVML OK' : ('NVML error: ' + (d.nvml_error || 'unknown'));
     }
 
     async function loadHistory() {
