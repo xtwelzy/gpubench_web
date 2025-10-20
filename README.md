@@ -1,4 +1,4 @@
-# 🧠 gpubench — GPU Stress Testing & Monitoring Suite
+# Gpubench — GPU Stress Testing & Monitoring Suite
 
 **gpubench** — это локальное Flask-веб-приложение для мониторинга и стресс-тестирования видеокарт (GPU) с визуализацией температуры, загрузки, потребления энергии и памяти.  
 Поддерживает **NVML**, **nvidia-smi**, **CuPy (CUDA)**, а также резерв через **OpenCL** или CPU-эмуляцию.
