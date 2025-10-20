@@ -32,7 +32,7 @@
 ---
 
 ## 🛠 Установка
-
+```
 ### 1️⃣ Клонируй проект
 git clone https://github.com/xtwelzy/gpubench.git
 cd gpubench
