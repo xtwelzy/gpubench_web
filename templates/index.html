@@ -1,221 +1,302 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{{ brand|default('gpubench') }} — Monitoring Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gpubench – Мониторинг</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/feather-icons"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: 'Poppins', sans-serif; background-color: #f8fafc; }
-    .glass-card { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-                  border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.05); }
+    body { font-family: 'Poppins', sans-serif; background-color:#f8fafc; }
+    .glass-card { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px); border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.05); }
+    .nav-gradient { background: linear-gradient(135deg,#6366f1 0%, #8b5cf6 100%); }
     .metric-card { transition: all .3s ease; }
     .metric-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0,0,0,.1); }
-    .nav-gradient { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
     .temp-gauge { background: conic-gradient(#4ade80 0% 30%, #facc15 30% 70%, #f87171 70% 100%); }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <!-- Nav -->
+
+    <!-- Навигация -->
     <nav class="nav-gradient rounded-2xl px-6 py-4 mt-6 mb-8 shadow-lg">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <i data-feather="cpu" class="text-white"></i>
           <span class="text-white font-semibold text-xl">gpubench</span>
-          <span class="text-white/80 text-sm">Monitoring Suite</span>
+          <span class="text-white/80 text-sm">Комплект мониторинга</span>
         </div>
         <div class="flex space-x-1">
-          <a href="{{ url_for('index') }}"  class="px-4 py-2 bg-white/20 text-white rounded-xl font-medium text-sm">Dashboard</a>
-          <a href="{{ url_for('stress') }}" class="px-4 py-2 text-white/80 hover:text-white rounded-xl font-medium text-sm">Stress Test</a>
-          <a href="/api/debug" class="p-2 text-white/80 hover:text-white rounded-full" title="Debug JSON"><i data-feather="terminal"></i></a>
+          <a href="{{ url_for('index') }}" class="px-4 py-2 bg-white/20 text-white rounded-xl font-medium text-sm">Панель</a>
+          <a href="{{ url_for('stress') }}" class="px-4 py-2 text-white/80 hover:text-white rounded-xl font-medium text-sm">Стресс-тест</a>
+          <button class="p-2 text-white/80 hover:text-white rounded-full" title="Настройки">
+            <i data-feather="settings"></i>
+          </button>
         </div>
       </div>
     </nav>
 
-    <!-- Summary -->
-    <div class="glass-card p-6 mb-8">
+    <!-- Сводка по GPU -->
+    <div class="glass-card p-6 mb-8" id="gpu-summary">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <div class="flex items-center space-x-4">
             <h2 class="text-2xl font-bold text-gray-800" id="gpu-name">GPU</h2>
-            <span id="state-chip" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium flex items-center">
-              <span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
-              <span id="state-label">—</span>
+            <span id="state-pill" class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              <span id="gpu-state">Оптимально</span>
             </span>
           </div>
-          <p class="text-gray-500 mt-1" id="gpu-driver">Driver: —</p>
+          <p class="text-gray-500 mt-1">
+            Драйвер: <span id="gpu-driver">—</span>
+            <span class="ml-3">CUDA/BIOS: —</span>
+          </p>
         </div>
-        <div class="flex space-x-10 mt-4 md:mt-0">
-          <div class="text-right">
-            <p class="text-sm text-gray-500">Core Clock</p>
+        <div class="flex space-x-6 mt-4 md:mt-0">
+          <div class="text-center">
+            <p class="text-sm text-gray-500">Частота ядра</p>
             <p class="text-lg font-semibold text-gray-800"><span id="core-clock">—</span></p>
           </div>
-          <div class="text-right">
-            <p class="text-sm text-gray-500">Memory Clock</p>
+          <div class="text-center">
+            <p class="text-sm text-gray-500">Частота памяти</p>
             <p class="text-lg font-semibold text-gray-800"><span id="mem-clock">—</span></p>
           </div>
-          <div class="text-right">
-            <p class="text-sm text-gray-500">Power Draw</p>
-            <p class="text-lg font-semibold text-gray-800"><span id="power-w">—</span></p>
+          <div class="text-center">
+            <p class="text-sm text-gray-500">Потребление</p>
+            <p class="text-lg font-semibold text-gray-800"><span id="power-draw">—</span></p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Grid -->
+    <!-- Основная сетка метрик -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <!-- Температура -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div><p class="text-sm text-gray-500">Temperature</p><p class="text-3xl font-bold text-gray-800"><span id="temp-now">—</span>°C</p></div>
-          <div class="temp-gauge w-16 h-16 rounded-full flex items-center justify-center"><div class="w-12 h-12 bg-white rounded-full flex items-center justify-center"><span class="text-sm font-bold text-gray-800" id="temp-center">—°</span></div></div>
+          <div>
+            <p class="text-sm text-gray-500">Температура</p>
+            <p class="text-3xl font-bold text-gray-800" id="temp-text">—°C</p>
+          </div>
+          <div class="temp-gauge w-16 h-16 rounded-full flex items-center justify-center">
+            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+              <span class="text-sm font-bold text-gray-800" id="temp-badge">—°</span>
+            </div>
+          </div>
         </div>
         <div class="h-40"><canvas id="tempChart"></canvas></div>
       </div>
 
+      <!-- Загрузка -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div><p class="text-sm text-gray-500">GPU Load</p><p class="text-3xl font-bold text-gray-800"><span id="load-now">—</span>%</p></div>
+          <div>
+            <p class="text-sm text-gray-500">Загрузка GPU</p>
+            <p class="text-3xl font-bold text-gray-800" id="load-text">—%</p>
+          </div>
           <i data-feather="activity" class="text-indigo-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="loadChart"></canvas></div>
       </div>
 
+      <!-- Память -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div><p class="text-sm text-gray-500">Memory Usage</p><p class="text-3xl font-bold text-gray-800"><span id="mem-used">—</span>/<span id="mem-total">—</span> MB</p></div>
+          <div>
+            <p class="text-sm text-gray-500">Использование памяти</p>
+            <p class="text-3xl font-bold text-gray-800"><span id="mem-used">—</span>/<span id="mem-total">—</span> МБ</p>
+          </div>
           <i data-feather="database" class="text-purple-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="memoryChart"></canvas></div>
       </div>
 
+      <!-- Вентилятор -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div><p class="text-sm text-gray-500">Fan Speed</p><p class="text-3xl font-bold text-gray-800"><span id="fan-now">—</span>%</p></div>
+          <div>
+            <p class="text-sm text-gray-500">Скорость вентилятора</p>
+            <p class="text-3xl font-bold text-gray-800" id="fan-text">—%</p>
+          </div>
           <i data-feather="wind" class="text-blue-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="fanChart"></canvas></div>
       </div>
 
+      <!-- Питание -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div><p class="text-sm text-gray-500">Power Consumption</p><p class="text-3xl font-bold text-gray-800"><span id="power-now">—</span>W</p></div>
+          <div>
+            <p class="text-sm text-gray-500">Потребляемая мощность</p>
+            <p class="text-3xl font-bold text-gray-800" id="power-text">— Вт</p>
+          </div>
           <i data-feather="zap" class="text-yellow-500" width="32" height="32"></i>
         </div>
         <div class="h-40"><canvas id="powerChart"></canvas></div>
       </div>
 
+      <!-- Оценка -->
       <div class="glass-card metric-card p-6">
         <div class="flex justify-between items-start mb-4">
-          <div><p class="text-sm text-gray-500">Performance Score</p><p class="text-3xl font-bold text-gray-800">—</p></div>
+          <div>
+            <p class="text-sm text-gray-500">Сводная оценка</p>
+            <p class="text-3xl font-bold text-gray-800" id="score-text">—/100</p>
+          </div>
           <i data-feather="award" class="text-green-500" width="32" height="32"></i>
         </div>
         <div class="h-40 flex items-center">
-          <div class="w-full bg-gray-200 rounded-full h-4"><div class="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full" style="width: 60%"></div></div>
+          <div class="w-full bg-gray-200 rounded-full h-4">
+            <div id="score-bar" class="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full" style="width: 0%"></div>
+          </div>
         </div>
-        <div class="mt-4 text-sm text-gray-500"><p>System is performing within expected parameters</p></div>
+        <div class="mt-4 text-sm text-gray-500">
+          <p id="score-note">Система работает в пределах ожидаемых параметров</p>
+        </div>
       </div>
     </div>
 
-    <!-- History -->
+    <!-- История за 24ч -->
     <div class="glass-card p-6 mb-8">
       <div class="flex justify-between items-center mb-6">
-        <h3 class="text-lg font-semibold text-gray-800">Historical Performance (24h)</h3>
+        <h3 class="text-lg font-semibold text-gray-800">История производительности (24 часа)</h3>
         <div class="flex space-x-2">
-          <button class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-sm">24h</button>
-          <button class="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded-lg text-sm">7d</button>
-          <button class="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded-lg text-sm">30d</button>
+          <button class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-sm">24ч</button>
+          <button class="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded-lg text-sm" disabled>7д</button>
+          <button class="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded-lg text-sm" disabled>30д</button>
         </div>
       </div>
       <div class="h-80"><canvas id="historicalChart"></canvas></div>
     </div>
+
   </div>
 
-  <script>feather.replace();</script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    function mkChart(ctx, label, color) {
-      return new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: [{label, data: [], borderColor: color, backgroundColor: color + '20', borderWidth: 2, tension: 0.3, fill: true}]},
-        options: { responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {x: {display:false}} }
-      });
-    }
-    const tempChart = mkChart(document.getElementById('tempChart').getContext('2d'), 'Temperature (°C)', '#f87171');
-    const loadChart = mkChart(document.getElementById('loadChart').getContext('2d'), 'Load (%)', '#6366f1');
-    const memChart  = mkChart(document.getElementById('memoryChart').getContext('2d'), 'Memory (MB)', '#8b5cf6');
-    const fanChart  = mkChart(document.getElementById('fanChart').getContext('2d'), 'Fan (%)', '#3b82f6');
-    const powerChart= mkChart(document.getElementById('powerChart').getContext('2d'), 'Power (W)', '#f59e0b');
+    feather.replace();
 
-    function push(chart, y) {
-      const labels = chart.data.labels, data = chart.data.datasets[0].data;
-      labels.push(labels.length); data.push(y);
-      if (labels.length > 60) { labels.shift(); data.shift(); }
-      chart.update();
-    }
+    // утилита запроса
+    async function getJSON(u){ const r=await fetch(u); return r.json(); }
 
-    function setChip(temp) {
-      const chip = document.getElementById('state-chip');
-      const label = document.getElementById('state-label');
-      if (temp >= 85) { chip.className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium flex items-center"; label.textContent="Hot"; }
-      else if (temp >= 75) { chip.className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center"; label.textContent="Elevated"; }
-      else { chip.className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center"; label.textContent="Optimal"; }
-    }
+    // графики
+    const tempChart = new Chart(document.getElementById('tempChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:Array.from({length:20},(_,i)=>i),
+        datasets:[{label:'Температура (°C)', data:Array(20).fill(null),
+          borderColor:'#f87171', backgroundColor:'rgba(248,113,113,0.1)', borderWidth:2, tension:.4, fill:true}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ y:{ beginAtZero:false, min:30, max:95 }, x:{ display:false } } }
+    });
 
-    async function refreshGpu() {
-      const r = await fetch('/api/gpu'); const d = await r.json();
+    const loadChart = new Chart(document.getElementById('loadChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:Array.from({length:20},(_,i)=>i),
+        datasets:[{label:'Загрузка (%)', data:Array(20).fill(null),
+          borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.1)', borderWidth:2, tension:.4, fill:true}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ y:{ beginAtZero:true, max:100 }, x:{ display:false } } }
+    });
 
-      document.getElementById('gpu-name').textContent = d.name || 'GPU';
-      document.getElementById('gpu-driver').textContent = 'Driver: ' + (d.driver || '—');
+    const memoryChart = new Chart(document.getElementById('memoryChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:Array.from({length:20},(_,i)=>i),
+        datasets:[{label:'Память (МБ)', data:Array(20).fill(null),
+          borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.1)', borderWidth:2, tension:.4, fill:true}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ y:{ beginAtZero:true }, x:{ display:false } } }
+    });
 
-      document.getElementById('core-clock').textContent = d.core_clock_mhz ? (d.core_clock_mhz + ' MHz') : '—';
-      document.getElementById('mem-clock').textContent  = d.mem_clock_mhz  ? (d.mem_clock_mhz  + ' MHz') : '—';
-      document.getElementById('power-w').textContent    = d.power_w        ? (d.power_w + ' W') : '—';
+    const fanChart = new Chart(document.getElementById('fanChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:Array.from({length:20},(_,i)=>i),
+        datasets:[{label:'Вентилятор (%)', data:Array(20).fill(null),
+          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', borderWidth:2, tension:.4, fill:true}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ y:{ beginAtZero:true, max:100 }, x:{ display:false } } }
+    });
 
-      document.getElementById('temp-now').textContent = d.temperature ?? '—';
-      document.getElementById('temp-center').textContent = (d.temperature ?? '—') + '°';
-      document.getElementById('load-now').textContent = d.load ?? '—';
-      document.getElementById('mem-used').textContent = d.mem_used_mb ?? '—';
-      document.getElementById('mem-total').textContent = d.mem_total_mb ?? '—';
-      document.getElementById('fan-now').textContent = d.fan_percent ?? '—';
-      document.getElementById('power-now').textContent = d.power_w ?? '—';
+    const powerChart = new Chart(document.getElementById('powerChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:Array.from({length:20},(_,i)=>i),
+        datasets:[{label:'Мощность (Вт)', data:Array(20).fill(null),
+          borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', borderWidth:2, tension:.4, fill:true}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ y:{ beginAtZero:true }, x:{ display:false } } }
+    });
 
-      setChip(d.temperature || 0);
+    const historicalChart = new Chart(document.getElementById('historicalChart').getContext('2d'), {
+      type:'line',
+      data:{ labels:[], datasets:[
+        {label:'Температура (°C)', data:[], borderColor:'#f87171', backgroundColor:'rgba(248,113,113,0.1)', borderWidth:2, tension:.2, fill:true},
+        {label:'Загрузка (%)', data:[], borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.1)', borderWidth:2, tension:.2, fill:true}
+      ] },
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}},
+        scales:{ y:{ beginAtZero:true, max:100 } } }
+    });
 
-      push(tempChart, d.temperature || 0);
-      push(loadChart, d.load || 0);
-      push(memChart, d.mem_used_mb || 0);
-      push(fanChart, d.fan_percent || 0);
-      push(powerChart, d.power_w || 0);
-
-      // Если NVML отсутствует — покажи подсказку в title чипа
-      const chip = document.getElementById('state-chip');
-      chip.title = d.nvml_ok ? 'NVML OK' : ('NVML error: ' + (d.nvml_error || 'unknown'));
-    }
-
-    async function loadHistory() {
-      const r = await fetch('/api/history'); const h = await r.json();
-      new Chart(document.getElementById('historicalChart').getContext('2d'), {
-        type: 'line',
-        data: {
-          labels: h.labels,
-          datasets: [
-            {label: 'Temperature (°C)', data: h.temperature, borderColor: '#f87171', backgroundColor: '#f8717120', borderWidth: 2, tension: .2, fill: true},
-            {label: 'Load (%)',         data: h.load,        borderColor: '#6366f1', backgroundColor: '#6366f120', borderWidth: 2, tension: .2, fill: true}
-          ]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
+    function push(chart, value){
+      chart.data.labels.push('');
+      if(chart.data.labels.length>20) chart.data.labels.shift();
+      chart.data.datasets[0].data.push(value);
+      chart.data.datasets[0].data = chart.data.datasets[0].data.slice(-20);
+      chart.update('none');
     }
 
-    loadHistory();
-    refreshGpu();
-    setInterval(refreshGpu, 2000);
+    async function poll(){
+      try{
+        const m = await getJSON('/api/gpu');
+
+        // сводка
+        document.getElementById('gpu-name').textContent = m.name || 'GPU';
+        document.getElementById('gpu-driver').textContent = m.driver || '—';
+
+        document.getElementById('core-clock').textContent = m.core_clock_mhz ? `${m.core_clock_mhz} МГц` : '—';
+        document.getElementById('mem-clock').textContent  = m.mem_clock_mhz  ? `${m.mem_clock_mhz} МГц` : '—';
+        document.getElementById('power-draw').textContent = m.power_w ? `${m.power_w} Вт` : '—';
+
+        // тайлы
+        const t = m.temperature ?? null;
+        const l = m.load ?? null;
+        const fan = m.fan_percent ?? null;
+        const pwr = m.power_w ?? null;
+
+        document.getElementById('temp-text').textContent = (t ?? '—') + '°C';
+        document.getElementById('temp-badge').textContent = (t ?? '—') + '°';
+        document.getElementById('load-text').textContent = (l ?? '—') + '%';
+        document.getElementById('fan-text').textContent  = (fan ?? '—') + '%';
+        document.getElementById('power-text').textContent= (pwr ?? '—') + ' Вт';
+
+        document.getElementById('mem-used').textContent  = m.mem_used_mb ?? '—';
+        document.getElementById('mem-total').textContent = m.mem_total_mb ?? '—';
+
+        // оценка «для вида»
+        const score = Math.max(0, Math.min(100, 100 - Math.max(0,(t||40)-40) - Math.max(0,(l||0)-70)/2));
+        document.getElementById('score-text').textContent = `${Math.round(score)}/100`;
+        document.getElementById('score-bar').style.width = `${Math.round(score)}%`;
+
+        // графики
+        if(t!=null) push(tempChart, Number(t));
+        if(l!=null) push(loadChart, Number(l));
+        if(m.mem_used_mb!=null) push(memoryChart, Number(m.mem_used_mb));
+        if(fan!=null) push(fanChart, Number(fan));
+        if(pwr!=null) push(powerChart, Number(pwr));
+
+        // история
+        const h = await getJSON('/api/history');
+        historicalChart.data.labels = h.labels;
+        historicalChart.data.datasets[0].data = h.temperature;
+        historicalChart.data.datasets[1].data = h.load;
+        historicalChart.update('none');
+
+      }catch(e){ console.warn(e); }
+      setTimeout(poll, 1000);
+    }
+
+    poll();
   </script>
 </body>
 </html>

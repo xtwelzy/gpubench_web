@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>gpubench – Stress Testing</title>
+  <title>gpubench – Стресс-тесты</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -11,74 +11,76 @@
   <script src="https://unpkg.com/feather-icons"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family:'Poppins',sans-serif; background-color:#f8fafc; }
+    body { font-family: 'Poppins', sans-serif; background-color:#f8fafc; }
     .glass-card { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px); border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.05); }
+      -webkit-backdrop-filter: blur(12px); border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.05); }
     .nav-gradient { background: linear-gradient(135deg,#6366f1 0%, #8b5cf6 100%); }
     .test-card { transition: all .2s ease; border: 2px solid transparent; }
     .test-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,.1); }
     .test-card.selected { border-color:#6366f1; background: rgba(99,102,241,.05); }
-    .start-btn { background: linear-gradient(135deg,#4ade80 0%, #22c55e 100%);
-      box-shadow: 0 4px 6px -1px rgba(74,222,128,.3); transition: all .3s ease; }
+    .start-btn { background: linear-gradient(135deg,#4ade80 0%, #22c55e 100%); box-shadow: 0 4px 6px -1px rgba(74,222,128,.3); transition: all .3s ease; }
     .start-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(74,222,128,.4); }
-    .stop-btn { background: linear-gradient(135deg,#f87171 0%, #ef4444 100%);
-      box-shadow: 0 4px 6px -1px rgba(248,113,113,.3); transition: all .3s ease; }
+    .stop-btn { background: linear-gradient(135deg,#f87171 0%, #ef4444 100%); box-shadow: 0 4px 6px -1px rgba(248,113,113,.3); transition: all .3s ease; }
     .stop-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(248,113,113,.4); }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+    <!-- Навигация -->
     <nav class="nav-gradient rounded-2xl px-6 py-4 mt-6 mb-8 shadow-lg">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <i data-feather="cpu" class="text-white"></i>
           <span class="text-white font-semibold text-xl">gpubench</span>
-          <span class="text-white/80 text-sm">Stress Testing Suite</span>
+          <span class="text-white/80 text-sm">Стресс-тестирование</span>
         </div>
         <div class="flex space-x-1">
-          <a href="/" class="px-4 py-2 text-white/80 hover:text-white rounded-xl font-medium text-sm">Dashboard</a>
-          <a href="/stress" class="px-4 py-2 bg-white/20 text-white rounded-xl font-medium text-sm">Stress Test</a>
-          <button class="p-2 text-white/80 hover:text-white rounded-full"><i data-feather="settings"></i></button>
+          <a href="{{ url_for('index') }}" class="px-4 py-2 text-white/80 hover:text-white rounded-xl font-medium text-sm">Панель</a>
+          <a href="{{ url_for('stress') }}" class="px-4 py-2 bg-white/20 text-white rounded-xl font-medium text-sm">Стресс-тест</a>
+          <button class="p-2 text-white/80 hover:text-white rounded-full" title="Настройки">
+            <i data-feather="settings"></i>
+          </button>
         </div>
       </div>
     </nav>
 
+    <!-- Сводка -->
     <div class="glass-card p-6 mb-8" id="gpu-summary">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <div class="flex items-center space-x-4">
             <h2 class="text-2xl font-bold text-gray-800" id="gpu-name">GPU</h2>
             <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium flex items-center">
-              <span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span><span id="gpu-state">Idle</span>
+              <span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+              <span id="gpu-state">Простаивает</span>
             </span>
           </div>
-          <p class="text-gray-500 mt-1">
-            <span id="gpu-driver">Driver: -</span>
-            <span class="ml-2" id="backend-tag"></span>
-          </p>
+          <p class="text-gray-500 mt-1">Готово к запуску — выберите профиль ниже</p>
         </div>
-        <div class="flex space-x-4 mt-4 md:mt-0">
+        <div class="flex space-x-6 mt-4 md:mt-0">
           <div class="text-center">
-            <p class="text-sm text-gray-500">Current Temp</p>
-            <p class="text-lg font-semibold text-gray-800" id="cur-temp">--°C</p>
+            <p class="text-sm text-gray-500">Текущая темп-ра</p>
+            <p class="text-lg font-semibold text-gray-800" id="cur-temp">—°C</p>
           </div>
           <div class="text-center">
-            <p class="text-sm text-gray-500">Current Load</p>
-            <p class="text-lg font-semibold text-gray-800" id="cur-load">--%</p>
+            <p class="text-sm text-gray-500">Текущая загрузка</p>
+            <p class="text-lg font-semibold text-gray-800" id="cur-load">—%</p>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Профили -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" id="profiles">
       <div class="glass-card test-card p-6 cursor-pointer selected" data-profile="quick">
         <div class="flex items-start space-x-4">
           <div class="p-3 bg-blue-100 rounded-xl"><i data-feather="zap" class="text-blue-600" width="24" height="24"></i></div>
-          <div><h3 class="font-semibold text-gray-800">Quick Test</h3><p class="text-sm text-gray-500">5–10 min basic stability check</p></div>
+          <div><h3 class="font-semibold text-gray-800">Быстрый тест</h3><p class="text-sm text-gray-500">5–10 мин, базовая стабильность</p></div>
         </div>
         <div class="mt-4 pt-4 border-t border-gray-100">
-          <div class="flex justify-between text-sm text-gray-500"><span>Intensity</span><span class="font-medium">Medium</span></div>
+          <div class="flex justify-between text-sm text-gray-500"><span>Интенсивность</span><span class="font-medium">Средняя</span></div>
           <div class="w-full bg-gray-200 rounded-full h-2 mt-2"><div class="bg-blue-500 h-2 rounded-full" style="width:60%"></div></div>
         </div>
       </div>
@@ -86,10 +88,10 @@
       <div class="glass-card test-card p-6 cursor-pointer" data-profile="full">
         <div class="flex items-start space-x-4">
           <div class="p-3 bg-purple-100 rounded-xl"><i data-feather="activity" class="text-purple-600" width="24" height="24"></i></div>
-          <div><h3 class="font-semibold text-gray-800">Full Load</h3><p class="text-sm text-gray-500">30 min sustained maximum load</p></div>
+          <div><h3 class="font-semibold text-gray-800">Полная нагрузка</h3><p class="text-sm text-gray-500">30 мин, максимум</p></div>
         </div>
         <div class="mt-4 pt-4 border-t border-gray-100">
-          <div class="flex justify-between text-sm text-gray-500"><span>Intensity</span><span class="font-medium">High</span></div>
+          <div class="flex justify-between text-sm text-gray-500"><span>Интенсивность</span><span class="font-medium">Высокая</span></div>
           <div class="w-full bg-gray-200 rounded-full h-2 mt-2"><div class="bg-purple-500 h-2 rounded-full" style="width:85%"></div></div>
         </div>
       </div>
@@ -97,10 +99,10 @@
       <div class="glass-card test-card p-6 cursor-pointer" data-profile="thermal">
         <div class="flex items-start space-x-4">
           <div class="p-3 bg-red-100 rounded-xl"><i data-feather="thermometer" class="text-red-600" width="24" height="24"></i></div>
-          <div><h3 class="font-semibold text-gray-800">Thermal Burn</h3><p class="text-sm text-gray-500">1h thermal throttling test</p></div>
+          <div><h3 class="font-semibold text-gray-800">Тепловой прожиг</h3><p class="text-sm text-gray-500">1 час, теплопакет/троттлинг</p></div>
         </div>
         <div class="mt-4 pt-4 border-t border-gray-100">
-          <div class="flex justify-between text-sm text-gray-500"><span>Intensity</span><span class="font-medium">Extreme</span></div>
+          <div class="flex justify-between text-sm text-gray-500"><span>Интенсивность</span><span class="font-medium">Экстремальная</span></div>
           <div class="w-full bg-gray-200 rounded-full h-2 mt-2"><div class="bg-red-500 h-2 rounded-full" style="width:100%"></div></div>
         </div>
       </div>
@@ -108,40 +110,42 @@
       <div class="glass-card test-card p-6 cursor-pointer" data-profile="memory">
         <div class="flex items-start space-x-4">
           <div class="p-3 bg-indigo-100 rounded-xl"><i data-feather="database" class="text-indigo-600" width="24" height="24"></i></div>
-          <div><h3 class="font-semibold text-gray-800">Memory Test</h3><p class="text-sm text-gray-500">VRAM intensive operations</p></div>
+          <div><h3 class="font-semibold text-gray-800">Память (VRAM)</h3><p class="text-sm text-gray-500">Интенсивные операции с VRAM</p></div>
         </div>
         <div class="mt-4 pt-4 border-t border-gray-100">
-          <div class="flex justify-between text-sm text-gray-500"><span>Intensity</span><span class="font-medium">High</span></div>
+          <div class="flex justify-between text-sm text-gray-500"><span>Интенсивность</span><span class="font-medium">Высокая</span></div>
           <div class="w-full bg-gray-200 rounded-full h-2 mt-2"><div class="bg-indigo-500 h-2 rounded-full" style="width:75%"></div></div>
         </div>
       </div>
     </div>
 
+    <!-- Управление и мониторинг -->
     <div class="glass-card p-6 mb-8">
-      <h3 class="text-lg font-semibold text-gray-800 mb-6">Test Controls</h3>
+      <h3 class="text-lg font-semibold text-gray-800 mb-6">Управление тестом</h3>
       <div class="flex flex-col md:flex-row md:space-x-6 space-y-6 md:space-y-0">
+
         <div class="flex-1">
           <div class="grid grid-cols-2 gap-4">
             <button id="startBtn" class="start-btn text-white font-medium py-3 px-6 rounded-xl flex items-center justify-center space-x-2">
-              <i data-feather="play" width="18" height="18"></i><span>Start Test</span>
+              <i data-feather="play" width="18" height="18"></i><span>Запустить тест</span>
             </button>
             <button id="stopBtn" class="stop-btn text-white font-medium py-3 px-6 rounded-xl flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed" disabled>
-              <i data-feather="square" width="18" height="18"></i><span>Stop Test</span>
+              <i data-feather="square" width="18" height="18"></i><span>Остановить</span>
             </button>
           </div>
 
           <div class="mt-6">
-            <h4 class="text-sm font-medium text-gray-500 mb-2">Test Parameters</h4>
+            <h4 class="text-sm font-medium text-gray-500 mb-2">Параметры</h4>
             <div class="space-y-3">
               <div>
                 <div class="flex justify-between text-sm text-gray-500 mb-1">
-                  <span>Duration</span><span class="font-medium text-gray-800" id="param-duration">10–60 minutes</span>
+                  <span>Длительность</span><span class="font-medium text-gray-800" id="param-duration">10–60 минут</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-purple-500 h-2 rounded-full" id="duration-bar" style="width:60%"></div></div>
               </div>
               <div>
                 <div class="flex justify-between text-sm text-gray-500 mb-1">
-                  <span>Target Temperature</span><span class="font-medium text-gray-800" id="param-temp">75–90°C</span>
+                  <span>Целевая температура</span><span class="font-medium text-gray-800" id="param-temp">75–90°C</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-red-500 h-2 rounded-full" id="temp-bar" style="width:80%"></div></div>
               </div>
@@ -150,51 +154,50 @@
         </div>
 
         <div class="flex-1">
-          <h4 class="text-sm font-medium text-gray-500 mb-4">Live Monitoring</h4>
+          <h4 class="text-sm font-medium text-gray-500 mb-4">Онлайн-мониторинг</h4>
           <div class="h-64"><canvas id="liveChart"></canvas></div>
           <div class="grid grid-cols-3 gap-4 mt-4">
             <div class="text-center p-3 bg-gray-50 rounded-lg">
-              <p class="text-sm text-gray-500">Current Temp</p>
-              <p class="text-xl font-semibold text-gray-800" id="tile-temp">--°C</p>
+              <p class="text-sm text-gray-500">Текущая темп-ра</p>
+              <p class="text-xl font-semibold text-gray-800" id="tile-temp">—°C</p>
             </div>
             <div class="text-center p-3 bg-gray-50 rounded-lg">
-              <p class="text-sm text-gray-500">Current Load</p>
-              <p class="text-xl font-semibold text-gray-800" id="tile-load">--%</p>
+              <p class="text-sm text-gray-500">Текущая загрузка</p>
+              <p class="text-xl font-semibold text-gray-800" id="tile-load">—%</p>
             </div>
             <div class="text-center p-3 bg-gray-50 rounded-lg">
-              <p class="text-sm text-gray-500">Time Elapsed</p>
+              <p class="text-sm text-gray-500">Прошло времени</p>
               <p class="text-xl font-semibold text-gray-800" id="tile-elapsed">0:00</p>
             </div>
           </div>
         </div>
+
       </div>
     </div>
 
-    <!-- History -->
+    <!-- История тестов -->
     <div class="glass-card p-6">
       <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold text-gray-800">Previous Test Results</h3>
-        <a id="export-latest" href="/api/test/export/latest" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-black/80">
-          Export latest CSV
-        </a>
+        <h3 class="text-lg font-semibold text-gray-800">Предыдущие результаты</h3>
+        <a id="export-latest" href="/api/test/export/latest" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-black/80">Экспорт последнего CSV</a>
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200" id="history-table">
           <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Backend</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Max Temp</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Temp</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Max Load</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Load</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Power</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Export</th>
-            </tr>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Начало</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Профиль</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Бэкенд</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Длительность</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Max °C</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Средн. °C</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Max %</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Средн. %</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Средн. Вт</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Экспорт</th>
+          </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200" id="history-body"></tbody>
         </table>
@@ -206,29 +209,30 @@
   <script>
     feather.replace();
 
-    // Chart
     const ctx = document.getElementById('liveChart').getContext('2d');
     const liveChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: Array.from({length: 60}, (_, i) => i),
-        datasets: [
-          {label:'Temperature (°C)', data:Array(60).fill(null), borderColor:'#f87171', backgroundColor:'rgba(248,113,113,0.1)', borderWidth:2, tension:0.2, fill:true},
-          {label:'Load (%)',         data:Array(60).fill(null), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.1)', borderWidth:2, tension:0.2, fill:true},
-        ]
-      },
-      options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, max:100 } }, plugins:{ legend:{ position:'top' } } }
+      type:'line',
+      data:{ labels:Array.from({length:60},(_,i)=>i),
+        datasets:[
+          {label:'Температура (°C)', data:Array(60).fill(null), borderColor:'#f87171',
+           backgroundColor:'rgba(248,113,113,0.1)', borderWidth:2, tension:.1, fill:true},
+          {label:'Загрузка (%)', data:Array(60).fill(null), borderColor:'#6366f1',
+           backgroundColor:'rgba(99,102,241,0.1)', borderWidth:2, tension:.1, fill:true}
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}},
+        scales:{ y:{ beginAtZero:true, max:100 } } }
     });
 
-    const $ = (s)=>document.querySelector(s);
-    const $$ = (s)=>Array.from(document.querySelectorAll(s));
-    let selectedProfile = 'quick';
-    let pollTimer = null;
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    let selectedProfile = 'quick', pollTimer=null;
 
-    function setButtonsRunning(run){
+    function setButtonsRunning(r){
       const start=$('#startBtn'), stop=$('#stopBtn');
-      if(run){ start.disabled=true; start.classList.add('opacity-50','cursor-not-allowed'); stop.disabled=false; stop.classList.remove('opacity-50','cursor-not-allowed'); }
-      else   { stop.disabled=true; stop.classList.add('opacity-50','cursor-not-allowed'); start.disabled=false; start.classList.remove('opacity-50','cursor-not-allowed'); }
+      if(r){ start.classList.add('opacity-50','cursor-not-allowed'); start.disabled=true;
+             stop.classList.remove('opacity-50','cursor-not-allowed'); stop.disabled=false; }
+      else { stop.classList.add('opacity-50','cursor-not-allowed'); stop.disabled=true;
+             start.classList.remove('opacity-50','cursor-not-allowed'); start.disabled=false; }
     }
 
     function pickProfile(card){
@@ -236,102 +240,111 @@
       card.classList.add('selected');
       selectedProfile = card.getAttribute('data-profile');
       const map = {
-        quick:{dur:'10 minutes',bar:60,temp:'75°C',tbar:70},
-        full:{dur:'30 minutes',bar:85,temp:'85°C',tbar:85},
-        thermal:{dur:'60 minutes',bar:100,temp:'90°C',tbar:95},
-        memory:{dur:'45 minutes',bar:75,temp:'80°C',tbar:80},
+        quick:   {dur:'10 минут', bar:60, temp:'75°C', tbar:70},
+        full:    {dur:'30 минут', bar:85, temp:'85°C', tbar:85},
+        thermal: {dur:'60 минут', bar:100, temp:'90°C', tbar:95},
+        memory:  {dur:'45 минут', bar:75, temp:'80°C', tbar:80},
       };
       const p = map[selectedProfile];
-      $('#param-duration').textContent=p.dur; $('#param-temp').textContent=p.temp;
-      $('#duration-bar').style.width=p.bar+'%'; $('#temp-bar').style.width=p.tbar+'%';
+      $('#param-duration').textContent = p.dur;
+      $('#param-temp').textContent = p.temp;
+      $('#duration-bar').style.width = p.bar+'%';
+      $('#temp-bar').style.width = p.tbar+'%';
     }
-    $$('.test-card').forEach(c=>c.addEventListener('click',()=>pickProfile(c)));
+
+    $$('.test-card').forEach(c => c.addEventListener('click', () => pickProfile(c)));
 
     async function apiStart(){
       try{
         const res = await fetch('/api/test/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:selectedProfile})});
-        const data = await res.json(); if(!res.ok || !data.ok) throw new Error(data.error||'start_failed');
+        const data=await res.json();
+        if(!res.ok || !data.ok) throw new Error(data.error||'start_failed');
         setButtonsRunning(true); loopPoll();
-      }catch(e){ alert('Start error: '+e.message); }
+      }catch(e){ alert('Ошибка запуска: '+e.message); }
+    }
+
+    async function _apiStopRaw(){
+      const res = await fetch('/api/test/stop',{method:'POST'});
+      return res.json();
     }
 
     async function apiStop(){
       try{
-        const res = await fetch('/api/test/stop',{method:'POST'});
-        const data = await res.json();
-        setButtonsRunning(false); if(pollTimer){ clearTimeout(pollTimer); pollTimer=null; }
+        const data = await _apiStopRaw();
+        setButtonsRunning(false);
+        if(pollTimer){ clearTimeout(pollTimer); pollTimer=null; }
+        await loadHistory();
+        document.getElementById('export-latest').href='/api/test/export/latest';
+        if(data.result){
+          console.log(`Сохранено: ${data.result.profile} • ${Math.floor(data.result.duration_sec/60)}м ${data.result.duration_sec%60}с • Max ${data.result.max_temp}°C`);
+        }
       }catch(e){ setButtonsRunning(false); }
     }
 
     async function pollStatus(){
       try{
-        const res = await fetch('/api/test/status'); const s = await res.json();
-        $('#gpu-name').textContent = s.name||'GPU';
-        $('#gpu-driver').textContent = 'Driver: '+(s.driver||'-');
-        $('#backend-tag').textContent = s.stress_backend ? `• backend: ${s.stress_backend}` : '';
-        $('#gpu-state').textContent = s.running ? 'Running' : 'Idle';
-        $('#cur-temp').textContent  = (s.temperature ?? '--')+'°C';
-        $('#cur-load').textContent  = (s.load ?? '--')+'%';
-        $('#tile-temp').textContent = (s.temperature ?? '--')+'°C';
-        $('#tile-load').textContent = (s.load ?? '--')+'%';
-        const m=Math.floor((s.elapsed||0)/60), sc=(s.elapsed||0)%60; $('#tile-elapsed').textContent=`${m}:${sc.toString().padStart(2,'0')}`;
-        liveChart.data.labels.push(''); if(liveChart.data.labels.length>60) liveChart.data.labels.shift();
+        const r = await fetch('/api/test/status'); const s = await r.json();
+        $('#gpu-name').textContent = s.name || 'GPU';
+        $('#gpu-state').textContent = s.running ? 'Выполняется' : 'Простаивает';
+
+        $('#cur-temp').textContent  = (s.temperature ?? '—') + '°C';
+        $('#cur-load').textContent  = (s.load ?? '—') + '%';
+        $('#tile-temp').textContent = (s.temperature ?? '—') + '°C';
+        $('#tile-load').textContent = (s.load ?? '—') + '%';
+
+        const m = Math.floor((s.elapsed||0)/60), sec=(s.elapsed||0)%60;
+        $('#tile-elapsed').textContent = `${m}:${sec.toString().padStart(2,'0')}`;
+
+        liveChart.data.labels.push('');
+        if(liveChart.data.labels.length>60) liveChart.data.labels.shift();
         liveChart.data.datasets[0].data.push(Number(s.temperature ?? null));
         liveChart.data.datasets[1].data.push(Number(s.load ?? null));
         liveChart.data.datasets[0].data = liveChart.data.datasets[0].data.slice(-60);
         liveChart.data.datasets[1].data = liveChart.data.datasets[1].data.slice(-60);
         liveChart.update('none');
+
         setButtonsRunning(!!s.running);
-      }catch(e){ console.warn('poll error',e); }
+      }catch(e){ console.warn('poll error', e); }
     }
 
     function loopPoll(){
       if(pollTimer) clearTimeout(pollTimer);
-      const go = async()=>{ await pollStatus(); pollTimer=setTimeout(go,1000); };
-      go();
+      const tick = async () => { await pollStatus(); pollTimer=setTimeout(tick,1000); };
+      tick();
     }
 
-    $('#startBtn').addEventListener('click', apiStart);
-    $('#stopBtn').addEventListener('click', apiStop);
-    pickProfile(document.querySelector('.test-card.selected') || document.querySelector('[data-profile="quick"]'));
-    loopPoll();
-
-    // ---- History & export ----
     async function loadHistory(){
-      const res = await fetch('/api/test/results'); const data = await res.json();
+      const res = await fetch('/api/test/results'); const data=await res.json();
       const tbody = document.getElementById('history-body'); tbody.innerHTML='';
       (data.results||[]).forEach(r=>{
         const tr=document.createElement('tr');
-        tr.innerHTML=`
+        tr.innerHTML = `
           <td class="px-4 py-3 text-sm text-gray-700">${r.id}</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.started_at}</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.profile}</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.backend}</td>
-          <td class="px-4 py-3 text-sm text-gray-700">${Math.floor(r.duration_sec/60)}m ${r.duration_sec%60}s</td>
+          <td class="px-4 py-3 text-sm text-gray-700">${Math.floor(r.duration_sec/60)}м ${r.duration_sec%60}с</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.max_temp}°C</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.avg_temp}°C</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.max_load}%</td>
           <td class="px-4 py-3 text-sm text-gray-700">${r.avg_load}%</td>
-          <td class="px-4 py-3 text-sm text-gray-700">${r.avg_power||0}W</td>
-          <td class="px-4 py-3"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${r.status==='Passed'?'bg-green-100 text-green-800':'bg-yellow-100 text-yellow-800'}">${r.status}</span></td>
+          <td class="px-4 py-3 text-sm text-gray-700">${r.avg_power || 0}Вт</td>
+          <td class="px-4 py-3">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${r.status==='Passed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+              ${r.status==='Passed' ? 'Пройдено' : 'Предупреждение'}
+            </span>
+          </td>
           <td class="px-4 py-3 text-sm"><a class="text-indigo-600 hover:underline" href="/api/test/export/${r.id}" target="_blank">CSV</a></td>`;
         tbody.appendChild(tr);
       });
     }
 
-    const _origApiStop = apiStop;
-    apiStop = async function(){
-      try{
-        const res = await fetch('/api/test/stop',{method:'POST'}); const data = await res.json();
-        setButtonsRunning(false); if(pollTimer){ clearTimeout(pollTimer); pollTimer=null; }
-        await loadHistory();
-        document.getElementById('export-latest').href='/api/test/export/latest';
-        if(data.result){
-          console.log(`Saved: ${data.result.profile} • ${Math.floor(data.result.duration_sec/60)}m ${data.result.duration_sec%60}s • Max ${data.result.max_temp}°C`);
-        }
-      }catch(e){ setButtonsRunning(false); }
-    }
+    // wiring
+    document.getElementById('startBtn').addEventListener('click', apiStart);
+    document.getElementById('stopBtn').addEventListener('click', apiStop);
 
+    pickProfile(document.querySelector('.test-card.selected') || document.querySelector('[data-profile="quick"]'));
+    loopPoll();
     loadHistory();
   </script>
 </body>
